@@ -1,0 +1,865 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+  <meta name="theme-color" content="#073f31">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Solo Circuit v0.2.1 Adaptive</title>
+  <style>
+:root {
+  --wood-dark:#4e2d18; --wood:#86552f; --felt:#064c3b; --felt-dark:#023a2e;
+  --gold:#e8bd58; --cream:#f4f0d9; --ink:#14201e; --cyan:#50e6ff;
+  --checker:34px; --point:46px; --topbar:74px; --gap:10px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#17221d;font-family:Inter,Segoe UI,Arial,sans-serif;color:#f8f5df;overscroll-behavior:none}
+button,select,input{font:inherit}
+button{color:#fff8d8;background:linear-gradient(#61421f,#3b260f);border:1px solid #a97733;border-radius:7px;min-height:36px;padding:7px 12px;cursor:pointer;box-shadow:inset 0 1px rgba(255,255,255,.12)}
+button:hover,button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.42;cursor:not-allowed;outline:none}.primary{background:linear-gradient(#b67b24,#74460f);font-weight:800}
+.app{height:100dvh;min-height:560px;display:grid;grid-template-rows:var(--topbar) 32px minmax(0,1fr) 38px;background:radial-gradient(circle at 50% 20%,#355644,#17221d 70%);overflow:hidden}
+.topbar{display:flex;align-items:center;gap:18px;padding:9px 18px;background:linear-gradient(180deg,#102b22,#0a201a);border-bottom:1px solid #98723b;z-index:5}
+.brand-block{min-width:240px}.brand-block h1{margin:0;font:italic 700 29px Georgia,serif;color:#f6d47a}.brand-block p{margin:3px 0 0;text-transform:uppercase;letter-spacing:2.2px;font-size:9px;color:#d2b96f}.version{opacity:.7;text-transform:none;letter-spacing:.4px}
+.turn-panel{display:flex;align-items:center;gap:8px;min-width:205px}.turn-dot,.score-chip{width:17px;height:17px;border-radius:50%;display:inline-block;border:2px solid #caa34e}.turn-dot.white,.score-chip.white{background:#fffef1}.turn-dot.black,.score-chip.black{background:#141413}.desktop-dice{display:flex;gap:5px;margin-left:6px}
+.actions{margin-left:auto;display:flex;gap:7px;align-items:center;flex-wrap:nowrap}.status-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px 18px;background:#0d3026;color:#d9c987;font-size:12px;border-bottom:1px solid rgba(232,189,88,.25)}#diceChoices{color:#6be8ff;font-weight:700}
+.board-viewport{min-height:0;padding:8px 10px;display:grid;place-items:center;overflow:hidden}.board{position:relative;width:min(100%,1450px);height:100%;max-height:calc((100vw - 20px)/2.08);min-height:390px;border:12px solid transparent;border-radius:18px;background:linear-gradient(var(--felt),var(--felt-dark)) padding-box,linear-gradient(115deg,#a26a37,#4b2915 32%,#9a6334 72%,#4b2915) border-box;box-shadow:0 14px 45px #0009,inset 0 0 0 2px #d0a65a,inset 0 0 55px #001c16;overflow:hidden;isolation:isolate}
+.board-texture{position:absolute;inset:0;opacity:.28;background-image:repeating-linear-gradient(65deg,transparent 0 4px,#ffffff08 5px 6px),radial-gradient(circle at 50% 40%,#24916b55,transparent 55%);pointer-events:none}.board.backgammon .backgammon-field{display:block;position:absolute;inset:6% 7%;background:linear-gradient(90deg,transparent 49.5%,#7b4b26 49.5% 50.5%,transparent 50.5%),repeating-linear-gradient(90deg,transparent 0 7.7%,#ddb65e26 7.7% 8.4%,transparent 8.4% 15.4%);border:2px solid #b98c47;border-radius:4px;clip-path:polygon(0 0,100% 0,100% 100%,0 100%)}.backgammon-field{display:none}
+.center-mark{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);width:190px;height:190px;border:1px solid #d5bb6633;border-radius:50%;display:grid;place-content:center;text-align:center;color:#d9c77c25;pointer-events:none}.center-mark b{font:italic 76px Georgia}.center-mark span{text-transform:uppercase;font-size:8px;letter-spacing:4px}
+.points{position:absolute;inset:0}.point{position:absolute;width:var(--point);height:var(--point);transform:translate(-50%,-50%);border:1px solid #d8bf6750;border-radius:9px;background:#003f315d;box-shadow:inset 0 0 13px #001b15;z-index:2;padding:0;overflow:visible}.point::after{content:attr(data-label);position:absolute;top:100%;left:50%;transform:translate(-50%,4px);font:bold 10px Georgia;color:#f1d16d}.point.top::after{top:auto;bottom:100%;transform:translate(-50%,-4px)}
+/* Neighboring row points are deliberately spaced by >=7.5% of board width; checkers never bridge the gap. */
+.point.has-selectable{z-index:6}.point.legal{z-index:8;border-color:#f7d45c;box-shadow:0 0 0 3px #f7d45c44,0 0 18px #f7d45c99,inset 0 0 13px #001b15}.point.legal::before{content:attr(data-distance);position:absolute;right:-7px;top:-9px;min-width:20px;height:20px;padding:0 4px;border-radius:10px;background:#f4c954;color:#17201b;display:grid;place-items:center;font-size:11px;font-weight:900;z-index:25}.point.selected-source{outline:3px solid var(--cyan);outline-offset:3px}.point.protected{border-style:double}.point.wall{box-shadow:0 0 0 3px #e85b4d88,inset 0 0 13px #001b15}
+.stack{position:absolute;inset:0;pointer-events:none}.checker{position:absolute;left:50%;top:50%;width:var(--checker);height:calc(var(--checker)*1.2);transform:translate(-50%,calc(-50% + var(--stack-offset,0px)));border-radius:8px;border:1px solid #777;box-shadow:2px 3px 4px #0008,inset -4px -5px 7px #0003,inset 3px 3px 4px #fff8;display:grid;place-items:center;font-size:8px;font-weight:900;transition:filter .15s,transform .15s}.checker.white{background:linear-gradient(135deg,#fffef1,#d8d7ca);color:#293a35}.checker.black{background:linear-gradient(135deg,#35342f,#080909);color:#e8d67f;border-color:#5e5c55}.checker.jailed::after{content:'×';color:#e5352d;font:bold calc(var(--checker)*.7) Arial;text-shadow:0 1px #fff;line-height:1}.checker.jailer{box-shadow:0 0 0 2px #f2c34d,2px 3px 4px #0008,inset -4px -5px 7px #0003}.checker.selectable{pointer-events:auto;cursor:pointer}.checker.selectable:hover{filter:brightness(1.18)}.checker.selectable:focus-visible{outline:3px solid var(--cyan)}
+.route-guide{position:absolute;z-index:1;color:#e9cf6c99;font-size:10px;letter-spacing:2px;text-transform:uppercase;display:flex;gap:9px;align-items:center;pointer-events:none;white-space:nowrap}.white-route{left:18%;top:54%}.black-route{right:18%;top:54%}.route-arrows{color:#ffd44e;font-size:13px;letter-spacing:3px;font-weight:800}
+.bank{position:absolute;bottom:1.8%;width:14%;min-width:135px;height:48px;display:flex;align-items:center;justify-content:center;gap:8px;z-index:4}.bank-white{left:42%;transform:translateX(-50%)}.bank-black{left:58%;transform:translateX(-50%)}.bank small{font-size:8px;letter-spacing:1.2px}.bank b{font-size:19px}.mini-brick{width:12px;height:23px;border-radius:3px;border:1px solid #aaa}.mini-brick.white{background:#f8f5df}.mini-brick.black{background:#111}
+.mobile-dice{display:none}.landing-callout{position:absolute;left:50%;bottom:13%;transform:translateX(-50%);min-height:24px;padding:5px 12px;border-radius:13px;background:#051f19d9;color:#69e7ff;font-size:11px;font-weight:800;opacity:0;transition:opacity .15s;z-index:20;pointer-events:none}.landing-callout.show{opacity:1}
+.scorebar{display:flex;justify-content:center;align-items:center;gap:80px;background:#0a211a;border-top:1px solid #76562c;font-size:12px}.scorebar>div{display:flex;align-items:center;gap:7px}.scorebar b{color:#f3ce68;font-size:17px}
+.dialog{width:min(720px,calc(100vw - 24px));max-height:calc(100dvh - 24px);overflow:auto;border:2px solid #c99a4c;border-radius:15px;color:#f7f0d6;background:linear-gradient(145deg,#123e31,#07251e);box-shadow:0 25px 80px #000c;padding:22px}.dialog::backdrop{background:#06110ed9;backdrop-filter:blur(5px)}.dialog h2{margin:0;text-align:center;color:#f0cb6c;font:italic 30px Georgia}.baseline{text-align:center;color:#b8cfc2;font-size:12px}.settings-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.dialog fieldset{border:1px solid #8a6c3b;border-radius:8px;display:grid;gap:7px}.dialog legend{color:#f1ca64}.dialog label{font-size:13px}.start-button{display:block;margin:18px auto 0;min-width:180px;font-weight:800}.message-dialog{text-align:center;width:min(430px,calc(100vw - 24px))}
+.rotate-note{display:none}
+@media (max-width:900px){.brand-block{min-width:170px}.turn-panel{min-width:150px}.actions button{padding:6px 8px;font-size:11px}.board{min-height:330px}}
+
+/* Mobile presentation is activated by capability/viewport detection in game.js, not by OS-only branching. */
+body.mobile-ui{--checker:42px;--point:55px;--topbar:54px;background:#071d17;touch-action:manipulation}
+body.mobile-ui .app{min-height:0;grid-template-rows:var(--topbar) 28px minmax(0,1fr) 34px}
+body.mobile-ui .topbar{padding:5px max(7px,env(safe-area-inset-right)) 5px max(7px,env(safe-area-inset-left));gap:7px}.mobile-ui .brand-block{min-width:0}.mobile-ui .brand-block h1{font-size:20px}.mobile-ui .brand-block p,.mobile-ui .turn-panel,.mobile-ui .desktop-dice{display:none}.mobile-ui .actions{width:100%;justify-content:flex-end;gap:5px}.mobile-ui .actions button{min-width:48px;min-height:44px;padding:5px 8px;font-size:10px}.mobile-ui #soundBtn{display:none}.mobile-ui .status-row{padding:3px 9px;font-size:10px}.mobile-ui .board-viewport{padding:4px max(4px,env(safe-area-inset-right)) 4px max(4px,env(safe-area-inset-left))}.mobile-ui .board{width:100%;height:100%;max-height:none;min-height:0;border-width:7px;border-radius:12px}.mobile-ui .point{min-width:48px;min-height:48px;border-width:2px}.mobile-ui .point.legal{border-color:var(--cyan);box-shadow:0 0 0 4px #50e6ff55,0 0 20px #50e6ff,inset 0 0 12px #001b15;animation:hintPulse 1.1s infinite alternate}.mobile-ui .point.legal::before{background:var(--cyan);min-width:25px;height:25px;border-radius:13px;font-size:12px;right:-9px;top:-11px}.mobile-ui .point.selected-source{outline-width:4px}.mobile-ui .checker{border-radius:10px}.mobile-ui .route-guide{font-size:8px}.mobile-ui .route-arrows{font-size:12px;font-weight:900}.mobile-ui .center-mark{width:130px;height:130px}.mobile-ui .center-mark b{font-size:48px}.mobile-ui .bank{height:44px;min-height:44px;min-width:118px;width:15%;bottom:1%;padding:3px 6px}.mobile-ui .bank small{font-size:7px}.mobile-ui .mobile-dice{display:grid;position:absolute;left:50%;top:49%;transform:translate(-50%,-50%);z-index:15;place-items:center;min-width:120px;min-height:84px;padding:7px 12px;border:2px solid #e8bd58;border-radius:16px;background:#062a21ee;box-shadow:0 5px 22px #0009}.mobile-ui .mobile-dice>span{font-size:9px;letter-spacing:2px;color:#f3d36f}.dice-faces{display:flex;gap:7px;justify-content:center;margin:4px}.die-face{width:34px;height:34px;border-radius:7px;background:#f8f4dc;color:#14201e;display:grid;place-items:center;font:bold 21px Georgia;box-shadow:inset -3px -3px 4px #8b8870,2px 3px 5px #0008}.mobile-ui .mobile-dice small{font-size:8px;color:#5ae5ff}.mobile-ui .landing-callout{bottom:14%;font-size:12px;padding:7px 15px}.mobile-ui .scorebar{gap:32px;font-size:10px}.mobile-ui .score-chip{width:14px;height:14px}.mobile-ui .scorebar b{font-size:14px}.mobile-ui .dialog{padding:15px}.mobile-ui .settings-grid{grid-template-columns:repeat(2,1fr)}
+@keyframes hintPulse{from{filter:brightness(.9)}to{filter:brightness(1.28)}}
+
+/* Landscape: large controls/checkers, while point centers retain explicit gaps. */
+body.mobile-ui.landscape{--checker:clamp(38px,6.6dvh,48px);--point:clamp(50px,8dvh,60px)}
+.mobile-ui.landscape .topbar{position:relative;background:#09271f;border-bottom:1px solid #76562c;pointer-events:auto;min-height:48px}.mobile-ui.landscape .brand-block{display:none}.mobile-ui.landscape .actions{pointer-events:auto}.mobile-ui.landscape .app{grid-template-rows:48px 26px minmax(0,1fr) 30px}.mobile-ui.landscape .status-row{z-index:6;background:#09271fdd;padding-left:10px;padding-right:10px}.mobile-ui.landscape .board-viewport{padding-top:2px}.mobile-ui.landscape .point.row-point{max-width:6.2vw}.mobile-ui.landscape .checker{max-width:5.4vw;max-height:8.2dvh}.mobile-ui.landscape .bank{bottom:.5%;height:39px;width:12%;min-width:95px}.mobile-ui.landscape .bank-white{left:43%}.mobile-ui.landscape .bank-black{left:57%}.mobile-ui.landscape .route-guide{opacity:.9}
+
+/* Portrait uses the same game and route, with a tall circuit geometry provided by JS. */
+body.mobile-ui.portrait{--checker:38px;--point:50px}.mobile-ui.portrait .app{grid-template-rows:104px 34px minmax(0,1fr) 38px}.mobile-ui.portrait .topbar{align-items:flex-start;flex-wrap:wrap}.mobile-ui.portrait .brand-block{display:block;width:100%;height:35px}.mobile-ui.portrait .brand-block p{display:block;font-size:7px}.mobile-ui.portrait .actions{justify-content:space-between}.mobile-ui.portrait .actions button{flex:1;min-width:0;padding:4px 3px}.mobile-ui.portrait .board{min-height:520px}.mobile-ui.portrait .mobile-dice{top:49%;min-width:108px}.mobile-ui.portrait .white-route{left:50%;top:35%;transform:translateX(-50%)}.mobile-ui.portrait .black-route{left:50%;right:auto;top:63%;transform:translateX(-50%)}.mobile-ui.portrait .bank{bottom:1.2%;width:24%;min-width:88px}.mobile-ui.portrait .bank-white{left:37%}.mobile-ui.portrait .bank-black{left:63%}.mobile-ui.portrait .settings-grid{grid-template-columns:1fr 1fr}
+@media (max-width:410px){body.mobile-ui.portrait{--checker:35px;--point:46px}.mobile-ui.portrait .dialog{padding:12px}.mobile-ui.portrait .settings-grid{gap:6px}.mobile-ui.portrait .dialog fieldset{padding:7px}.mobile-ui.portrait .scorebar{gap:15px}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+  </style>
+</head>
+<body>
+  <main id="app" class="app" aria-live="polite">
+    <header class="topbar">
+      <div class="brand-block">
+        <h1>Solo Circuit</h1>
+        <p>One player · Two colors <span class="version">v0.2.1 adaptive</span></p>
+      </div>
+      <div class="turn-panel">
+        <span class="turn-dot white" id="turnDot"></span>
+        <strong id="turnText">White to play</strong>
+        <span class="desktop-dice" id="desktopDice" aria-label="Current dice"></span>
+      </div>
+      <nav class="actions" aria-label="Game controls">
+        <button id="rollBtn" class="primary">Roll dice</button>
+        <button id="undoBtn">Undo</button>
+        <button id="soundBtn" aria-pressed="true">Sound on</button>
+        <button id="fullscreenBtn">Full screen</button>
+        <button id="restartBtn">Restart</button>
+      </nav>
+    </header>
+
+    <section class="status-row">
+      <span id="statusText">Choose settings to begin.</span>
+      <span id="diceChoices"></span>
+    </section>
+
+    <section id="boardViewport" class="board-viewport">
+      <div id="board" class="board circuit" aria-label="Solo Circuit game board">
+        <div class="board-texture"></div>
+        <div class="backgammon-field" aria-hidden="true"></div>
+        <div class="center-mark" aria-hidden="true"><b>SC</b><span>One player<br>Two colors</span></div>
+
+        <div class="route-guide white-route" aria-label="White direction: left, up, right, then down">
+          <span class="route-label">WHITE</span><span class="route-arrows">← &nbsp; ↑ &nbsp; → &nbsp; ↓</span>
+        </div>
+        <div class="route-guide black-route" aria-label="Black direction: right, up, left, then down">
+          <span class="route-label">BLACK</span><span class="route-arrows">→ &nbsp; ↑ &nbsp; ← &nbsp; ↓</span>
+        </div>
+
+        <div id="points" class="points"></div>
+
+        <button id="whiteBank" class="bank bank-white" data-color="white" aria-label="White Bank">
+          <span class="mini-brick white"></span><small>WHITE BANK</small><b id="whiteBankCount">0</b>
+        </button>
+        <button id="blackBank" class="bank bank-black" data-color="black" aria-label="Black Bank">
+          <span class="mini-brick black"></span><small>BLACK BANK</small><b id="blackBankCount">0</b>
+        </button>
+
+        <div id="mobileDice" class="mobile-dice" aria-label="Dice shown inside the board">
+          <span id="mobileTurn">WHITE</span>
+          <div id="mobileDiceFaces" class="dice-faces"></div>
+          <small id="mobileDiceHint">ROLL</small>
+        </div>
+
+        <div id="landingCallout" class="landing-callout" role="status"></div>
+      </div>
+    </section>
+
+    <footer class="scorebar">
+      <div><span class="score-chip white"></span> White <b id="whiteScore">0</b></div>
+      <div id="roundText">Round 1 · Best of 3</div>
+      <div><span class="score-chip black"></span> Black <b id="blackScore">0</b></div>
+    </footer>
+  </main>
+
+  <dialog id="settingsDialog" class="dialog" open>
+    <form id="settingsForm" method="dialog">
+      <h2>Start Solo Circuit</h2>
+      <p class="baseline">Same v0.2.0 game rules · adaptive presentation</p>
+      <div class="settings-grid">
+        <fieldset><legend>Mode</legend>
+          <label><input type="radio" name="mode" value="regular" checked> Regular</label>
+          <label><input type="radio" name="mode" value="jail"> Jail</label>
+        </fieldset>
+        <fieldset><legend>Dice</legend>
+          <label><input type="radio" name="diceCount" value="1"> One dice</label>
+          <label><input type="radio" name="diceCount" value="2" checked> Two dice</label>
+        </fieldset>
+        <fieldset><legend>Wall</legend>
+          <label><input type="radio" name="wallSize" value="3" checked> 3 bricks</label>
+          <label><input type="radio" name="wallSize" value="4"> 4 bricks</label>
+        </fieldset>
+        <fieldset><legend>Board</legend>
+          <label><input type="radio" name="layout" value="circuit" checked> Circuit</label>
+          <label><input type="radio" name="layout" value="backgammon"> Backgammon-style</label>
+        </fieldset>
+        <fieldset><legend>Match</legend>
+          <select name="matchBestOf" aria-label="Match length"><option value="3">Best of 3</option><option value="5">Best of 5</option><option value="7">Best of 7</option><option value="9">Best of 9</option></select>
+        </fieldset>
+        <fieldset><legend>Rolling</legend>
+          <label><input type="checkbox" name="autoRoll"> Auto Roll</label>
+        </fieldset>
+      </div>
+      <button class="start-button" value="start">Start game</button>
+    </form>
+  </dialog>
+
+  <dialog id="messageDialog" class="dialog message-dialog">
+    <h2 id="messageTitle">Round complete</h2>
+    <p id="messageBody"></p>
+    <button id="continueBtn">Continue</button>
+  </dialog>
+
+  <script>
+/* Solo Circuit v0.2.1 Adaptive — v0.2.0 rules engine (UMD) */
+(function (root, factory) {
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.SoloCircuitEngine = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  const COLORS = ['white', 'black'];
+  const clampInt = (n, min, max) => Math.max(min, Math.min(max, Math.trunc(Number(n))));
+  const other = color => color === 'white' ? 'black' : 'white';
+  const physicalAt = (color, progress) => color === 'white' ? progress : 23 - progress;
+  const progressAt = (color, physical) => color === 'white' ? physical : 23 - physical;
+
+  function makeSettings(input = {}) {
+    return {
+      mode: input.mode === 'jail' ? 'jail' : 'regular',
+      diceCount: Number(input.diceCount) === 1 ? 1 : 2,
+      wallSize: Number(input.wallSize) === 4 ? 4 : 3,
+      layout: input.layout === 'backgammon' ? 'backgammon' : 'circuit',
+      autoRoll: Boolean(input.autoRoll),
+      matchBestOf: [3, 5, 7, 9].includes(Number(input.matchBestOf)) ? Number(input.matchBestOf) : 3
+    };
+  }
+
+  function createGame(settings = {}, rng = Math.random) {
+    const game = {
+      version: '0.2.1-adaptive',
+      rulesBaseline: '0.2.0',
+      settings: makeSettings(settings),
+      pieces: [],
+      turn: 'white',
+      dice: [],
+      remainingUnits: [],
+      combinedAvailable: false,
+      rolled: false,
+      banks: { white: 0, black: 0 },
+      roundWins: { white: 0, black: 0 },
+      status: 'playing',
+      message: 'White begins. Roll the dice.',
+      moveCounter: 0,
+      round: 1,
+      rng
+    };
+    resetPieces(game);
+    return game;
+  }
+
+  function resetPieces(game) {
+    game.pieces = [];
+    for (const color of COLORS) {
+      for (let i = 0; i < 15; i++) {
+        game.pieces.push({
+          id: `${color[0].toUpperCase()}${i + 1}`,
+          color,
+          progress: Math.floor(i / 3),
+          banked: false,
+          jailedBy: null,
+          order: ++game.moveCounter
+        });
+      }
+    }
+    game.turn = 'white';
+    game.dice = [];
+    game.remainingUnits = [];
+    game.combinedAvailable = false;
+    game.rolled = false;
+    game.banks = { white: 0, black: 0 };
+    game.status = 'playing';
+    game.message = 'White begins. Roll the dice.';
+  }
+
+  function cloneState(game) {
+    const copy = JSON.parse(JSON.stringify(game, (key, value) => key === 'rng' ? undefined : value));
+    return copy;
+  }
+
+  function restoreState(game, state) {
+    const rng = game.rng;
+    for (const key of Object.keys(game)) delete game[key];
+    Object.assign(game, JSON.parse(JSON.stringify(state)));
+    game.rng = rng || Math.random;
+    return game;
+  }
+
+  function targetWins(game) {
+    return Math.ceil(game.settings.matchBestOf / 2);
+  }
+
+  function piecesAt(game, physical) {
+    return game.pieces
+      .filter(p => !p.banked && physicalAt(p.color, p.progress) === physical)
+      .sort((a, b) => a.order - b.order);
+  }
+
+  function colorCountAt(game, physical, color) {
+    return piecesAt(game, physical).filter(p => p.color === color).length;
+  }
+
+  function allInOpponentHome(game, color) {
+    return game.pieces.filter(p => p.color === color && !p.banked).every(p => p.progress >= 19);
+  }
+
+  function wallAt(game, physical, color) {
+    return colorCountAt(game, physical, color) >= game.settings.wallSize;
+  }
+
+  function isJailer(game, pieceId) {
+    return game.pieces.some(p => p.jailedBy === pieceId);
+  }
+
+  function releasePrisoners(game, jailerId) {
+    let released = 0;
+    for (const p of game.pieces) {
+      if (p.jailedBy === jailerId) {
+        p.jailedBy = null;
+        released++;
+      }
+    }
+    return released;
+  }
+
+  function roll(game, forced) {
+    if (game.status !== 'playing' || game.rolled) return null;
+    const count = game.settings.diceCount;
+    const values = forced ? forced.slice(0, count).map(n => clampInt(n, 1, 6)) :
+      Array.from({ length: count }, () => 1 + Math.floor(game.rng() * 6));
+    if (values.length !== count) throw new Error(`Expected ${count} dice value(s)`);
+    game.dice = values;
+    if (count === 2 && values[0] === values[1]) {
+      game.remainingUnits = [values[0], values[0], values[0], values[0]];
+      game.combinedAvailable = false;
+      game.message = `${capitalize(game.turn)} rolled doubles ${values[0]} — four moves available.`;
+    } else {
+      game.remainingUnits = values.slice();
+      game.combinedAvailable = count === 2;
+      game.message = `${capitalize(game.turn)} rolled ${values.join(' + ')}.`;
+    }
+    game.rolled = true;
+    if (!hasAnyLegalMove(game, game.turn)) {
+      game.message += ' No legal move; turn passes.';
+      endTurn(game);
+      return { passed: true, values };
+    }
+    return { passed: false, values };
+  }
+
+  function availableDistances(game) {
+    if (!game.rolled || !game.remainingUnits.length) return [];
+    const units = game.remainingUnits.slice();
+    if (game.settings.diceCount === 1) return [units[0]];
+    const originalDouble = game.dice.length === 2 && game.dice[0] === game.dice[1];
+    if (originalDouble) {
+      return Array.from({ length: units.length }, (_, i) => units[0] * (i + 1));
+    }
+    const values = [...new Set(units)];
+    if (game.combinedAvailable && units.length === 2) values.push(units[0] + units[1]);
+    return [...new Set(values)].sort((a, b) => a - b);
+  }
+
+  function sourcePiece(game, pieceOrId) {
+    return typeof pieceOrId === 'string' ? game.pieces.find(p => p.id === pieceOrId) : pieceOrId;
+  }
+
+  function canLandAt(game, color, physical) {
+    const opponent = other(color);
+    return colorCountAt(game, physical, opponent) < 2;
+  }
+
+  function pathBlocked(game, color, fromProgress, toProgress) {
+    const opponent = other(color);
+    const capped = Math.min(toProgress, 23);
+    for (let p = fromProgress + 1; p < capped; p++) {
+      if (wallAt(game, physicalAt(color, p), opponent)) return true;
+    }
+    return false;
+  }
+
+  function canBearOff(game, piece, distance) {
+    if (!allInOpponentHome(game, piece.color)) return false;
+    const target = piece.progress + distance;
+    if (target === 24) return true;
+    if (target < 24) return false;
+    const fartherExists = game.pieces.some(p =>
+      p.color === piece.color && !p.banked && p.id !== piece.id && p.progress < piece.progress
+    );
+    return !fartherExists;
+  }
+
+  function legalMove(game, pieceOrId, distance) {
+    const piece = sourcePiece(game, pieceOrId);
+    distance = Number(distance);
+    if (!piece || game.status !== 'playing') return { legal: false, reason: 'No such brick.' };
+    if (!game.rolled) return { legal: false, reason: 'Roll the dice first.' };
+    if (piece.color !== game.turn) return { legal: false, reason: `It is ${game.turn}'s turn.` };
+    if (piece.banked) return { legal: false, reason: 'That brick is already in the Bank.' };
+    if (piece.jailedBy) return { legal: false, reason: 'That brick is jailed.' };
+    if (!availableDistances(game).includes(distance)) return { legal: false, reason: 'That dice distance is not available.' };
+    const targetProgress = piece.progress + distance;
+    if (pathBlocked(game, piece.color, piece.progress, targetProgress)) {
+      return { legal: false, reason: 'An opponent wall blocks the route.' };
+    }
+    if (targetProgress > 23) {
+      if (!canBearOff(game, piece, distance)) return { legal: false, reason: 'Bearing-off priority requires a different move.' };
+      return { legal: true, bank: true, distance, piece };
+    }
+    const physical = physicalAt(piece.color, targetProgress);
+    if (!canLandAt(game, piece.color, physical)) {
+      return { legal: false, reason: 'The destination is protected by two or more opponent bricks.' };
+    }
+    return { legal: true, bank: false, distance, piece, targetProgress, physical };
+  }
+
+  function legalMovesForPiece(game, pieceOrId) {
+    const piece = sourcePiece(game, pieceOrId);
+    if (!piece) return [];
+    return availableDistances(game)
+      .map(distance => legalMove(game, piece, distance))
+      .filter(result => result.legal);
+  }
+
+  function hasAnyLegalMove(game, color = game.turn) {
+    if (color !== game.turn || !game.rolled) return false;
+    return game.pieces.some(p => p.color === color && !p.banked && legalMovesForPiece(game, p).length);
+  }
+
+  function consumeDistance(game, distance) {
+    const isDouble = game.settings.diceCount === 2 && game.dice[0] === game.dice[1];
+    if (isDouble) {
+      const count = distance / game.dice[0];
+      if (!Number.isInteger(count) || count < 1 || count > game.remainingUnits.length) throw new Error('Invalid doubles grouping');
+      game.remainingUnits.splice(0, count);
+      return;
+    }
+    if (game.combinedAvailable && game.remainingUnits.length === 2 && distance === game.remainingUnits[0] + game.remainingUnits[1]) {
+      game.remainingUnits = [];
+      game.combinedAvailable = false;
+      return;
+    }
+    const index = game.remainingUnits.indexOf(distance);
+    if (index < 0) throw new Error('Dice distance is unavailable');
+    game.remainingUnits.splice(index, 1);
+    game.combinedAvailable = false;
+  }
+
+  function resetHitPiece(game, piece) {
+    releasePrisoners(game, piece.id);
+    piece.progress = 4;
+    piece.jailedBy = null;
+    piece.order = ++game.moveCounter;
+  }
+
+  function resolveRegularLanding(game, mover, physical) {
+    const opponents = piecesAt(game, physical).filter(p => p.color !== mover.color);
+    if (opponents.length === 1) {
+      const hit = opponents[0];
+      resetHitPiece(game, hit);
+      return `${capitalize(hit.color)} was hit and returned to home position 5.`;
+    }
+    return '';
+  }
+
+  function resolveJailLanding(game, mover, physical) {
+    const stack = piecesAt(game, physical);
+    const opponents = stack.filter(p => p.color !== mover.color);
+    const allies = stack.filter(p => p.color === mover.color && p.id !== mover.id);
+    if (opponents.length !== 1) return '';
+    const target = opponents[0];
+    if (target.jailedBy) return '';
+    if (allies.length >= 1 && isJailer(game, target.id)) {
+      releasePrisoners(game, target.id);
+      target.jailedBy = mover.id;
+      return `${capitalize(mover.color)} counter-jailed ${capitalize(target.color)}; the original prisoner escaped.`;
+    }
+    if (allies.length === 0) {
+      target.jailedBy = mover.id;
+      return `${capitalize(mover.color)} jailed ${capitalize(target.color)}.`;
+    }
+    return '';
+  }
+
+  function performMove(game, pieceOrId, distance) {
+    const check = legalMove(game, pieceOrId, distance);
+    if (!check.legal) return check;
+    const piece = check.piece;
+    const released = releasePrisoners(game, piece.id);
+    let action = released ? `${capitalize(piece.color)}'s jailer moved and released ${released} prisoner${released === 1 ? '' : 's'}. ` : '';
+    if (check.bank) {
+      piece.banked = true;
+      piece.progress = 24;
+      piece.jailedBy = null;
+      piece.order = ++game.moveCounter;
+      game.banks[piece.color]++;
+      action += `${capitalize(piece.color)} banked a brick.`;
+    } else {
+      piece.progress = check.targetProgress;
+      piece.order = ++game.moveCounter;
+      action += game.settings.mode === 'regular' ? resolveRegularLanding(game, piece, check.physical) : resolveJailLanding(game, piece, check.physical);
+      if (game.settings.mode === 'jail' && check.targetProgress === 23) {
+        const jailed = game.pieces.some(p => p.jailedBy === piece.id);
+        if (jailed) {
+          game.roundWins[piece.color] += 2;
+          action += ` ${capitalize(piece.color)} earned two round wins for a position-1 home jail.`;
+          if (game.roundWins[piece.color] >= targetWins(game)) {
+            game.status = 'match-over';
+            game.message = `${capitalize(piece.color)} wins the match by the special position-1 jail.`;
+          }
+        }
+      }
+    }
+    consumeDistance(game, distance);
+    if (game.status !== 'playing') return { ...check, action, matchOver: true };
+    if (game.banks[piece.color] === 15) {
+      game.roundWins[piece.color]++;
+      if (game.roundWins[piece.color] >= targetWins(game)) {
+        game.status = 'match-over';
+        game.message = `${capitalize(piece.color)} wins the match.`;
+      } else {
+        game.status = 'round-over';
+        game.message = `${capitalize(piece.color)} wins round ${game.round}.`;
+      }
+      return { ...check, action, roundOver: true };
+    }
+    if (!game.remainingUnits.length || !hasAnyLegalMove(game, game.turn)) {
+      if (game.remainingUnits.length) action += ' No further legal move; remaining dice are forfeited.';
+      endTurn(game);
+    } else {
+      game.message = action || `${capitalize(piece.color)} moved ${distance}.`;
+    }
+    return { ...check, action };
+  }
+
+  function endTurn(game) {
+    game.turn = other(game.turn);
+    game.dice = [];
+    game.remainingUnits = [];
+    game.combinedAvailable = false;
+    game.rolled = false;
+    game.message = `${capitalize(game.turn)} to play${game.settings.autoRoll ? '.' : ' — roll the dice.'}`;
+  }
+
+  function nextRound(game) {
+    if (game.status !== 'round-over') return false;
+    game.round++;
+    resetPieces(game);
+    return true;
+  }
+
+  function capitalize(text) { return String(text).charAt(0).toUpperCase() + String(text).slice(1); }
+
+  return {
+    COLORS, createGame, cloneState, restoreState, resetPieces, roll, availableDistances,
+    piecesAt, colorCountAt, physicalAt, progressAt, allInOpponentHome, wallAt, isJailer,
+    releasePrisoners, legalMove, legalMovesForPiece, hasAnyLegalMove, performMove,
+    endTurn, nextRound, targetWins, capitalize, other
+  };
+});
+
+  </script>
+  <script>
+/* Solo Circuit v0.2.1 Adaptive UI — one codebase, capability-responsive presentation */
+(function () {
+  'use strict';
+  const E = window.SoloCircuitEngine;
+  const $ = id => document.getElementById(id);
+  const els = {
+    board: $('board'), points: $('points'), status: $('statusText'), choices: $('diceChoices'),
+    turnText: $('turnText'), turnDot: $('turnDot'), desktopDice: $('desktopDice'), mobileDiceFaces: $('mobileDiceFaces'),
+    mobileTurn: $('mobileTurn'), mobileDiceHint: $('mobileDiceHint'), roll: $('rollBtn'), undo: $('undoBtn'),
+    sound: $('soundBtn'), fullscreen: $('fullscreenBtn'), restart: $('restartBtn'), settings: $('settingsDialog'),
+    settingsForm: $('settingsForm'), whiteBank: $('whiteBank'), blackBank: $('blackBank'), whiteBankCount: $('whiteBankCount'),
+    blackBankCount: $('blackBankCount'), whiteScore: $('whiteScore'), blackScore: $('blackScore'), roundText: $('roundText'),
+    landingCallout: $('landingCallout'), messageDialog: $('messageDialog'), messageTitle: $('messageTitle'),
+    messageBody: $('messageBody'), continueBtn: $('continueBtn')
+  };
+
+  const landscapeCoords = [
+    [34,88],[27,88],[20,88],[13,88],[6,88], [6,74],[6,58],[6,42],[6,26],
+    [12,12],[27,12],[41,12],[59,12],[73,12],[88,12], [94,26],[94,42],[94,58],[94,74],
+    [66,88],[73,88],[80,88],[87,88],[94,88]
+  ];
+  const portraitCoords = [
+    [18,56],[18,65],[18,74],[18,83],[18,92], [18,46],[18,37],[18,28],[18,19],
+    [8,10],[25,10],[42,10],[58,10],[75,10],[92,10], [82,19],[82,28],[82,37],[82,46],
+    [82,56],[82,65],[82,74],[82,83],[82,92]
+  ];
+
+  let game = E.createGame();
+  let selectedId = null;
+  let destinationMap = new Map();
+  let bankMoves = [];
+  let history = [];
+  let soundOn = true;
+  let audioContext = null;
+  let autoTimer = null;
+
+  function detectPresentation() {
+    const w = window.innerWidth, h = window.innerHeight;
+    const shortSide = Math.min(w, h), longSide = Math.max(w, h);
+    const coarse = matchMedia('(pointer: coarse)').matches;
+    const noHover = matchMedia('(hover: none)').matches;
+    const touch = (navigator.maxTouchPoints || 0) > 0;
+    const hintedMobile = Boolean(navigator.userAgentData && navigator.userAgentData.mobile);
+    const mobileUA = /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(navigator.userAgent || '');
+    const capabilityMobile = (coarse || noHover || touch) && shortSide <= 900 && longSide <= 1400;
+    const compactTouch = shortSide <= 560 && (coarse || noHover || touch);
+    const mobile = hintedMobile || mobileUA || capabilityMobile || compactTouch;
+    document.body.classList.toggle('mobile-ui', mobile);
+    document.body.classList.toggle('landscape', mobile && w >= h);
+    document.body.classList.toggle('portrait', mobile && h > w);
+    document.body.dataset.presentation = mobile ? (w >= h ? 'mobile-landscape' : 'mobile-portrait') : 'desktop';
+    layoutPoints();
+  }
+
+  function coords() {
+    return document.body.classList.contains('portrait') ? portraitCoords : landscapeCoords;
+  }
+
+  function pointLabel(index) {
+    if (index <= 4) return String(5 - index);
+    if (index >= 19) return String(index - 18 === 5 ? 1 : 24 - index); // physical 19..23 => 5..1
+    return '';
+  }
+
+  function layoutPoints() {
+    const xy = coords();
+    els.points.querySelectorAll('.point').forEach((point, i) => {
+      point.style.left = `${xy[i][0]}%`;
+      point.style.top = `${xy[i][1]}%`;
+    });
+  }
+
+  function createPoints() {
+    const fragment = document.createDocumentFragment();
+    for (let i = 0; i < 24; i++) {
+      const point = document.createElement('button');
+      point.type = 'button';
+      point.className = `point ${i <= 4 || i >= 19 ? 'bottom row-point' : ''} ${i >= 9 && i <= 14 ? 'top row-point' : ''}`;
+      point.dataset.position = i;
+      point.dataset.label = pointLabel(i);
+      point.setAttribute('aria-label', `Board position ${i + 1}`);
+      point.addEventListener('click', () => activateDestination(i));
+      point.addEventListener('pointerenter', () => previewDestination(i));
+      point.addEventListener('pointerleave', clearPreview);
+      const stack = document.createElement('span');
+      stack.className = 'stack';
+      point.appendChild(stack);
+      fragment.appendChild(point);
+    }
+    els.points.replaceChildren(fragment);
+    layoutPoints();
+  }
+
+  function diceFace(value) {
+    const face = document.createElement('span');
+    face.className = 'die-face';
+    face.textContent = value || '–';
+    return face;
+  }
+
+  function renderDice() {
+    els.desktopDice.replaceChildren(...(game.dice.length ? game.dice : ['–']).map(diceFace));
+    els.mobileDiceFaces.replaceChildren(...(game.dice.length ? game.dice : ['–']).map(diceFace));
+    els.mobileTurn.textContent = game.turn.toUpperCase();
+    els.mobileDiceHint.textContent = game.rolled ? `MOVES ${E.availableDistances(game).join(' / ') || '—'}` : (game.settings.autoRoll ? 'AUTO ROLL' : 'TAP ROLL');
+  }
+
+  function topOffset(index, count, physical) {
+    const direction = (physical <= 4 || physical >= 19) ? -1 : (physical >= 9 && physical <= 14 ? 1 : 1);
+    const mobile = document.body.classList.contains('mobile-ui');
+    const portrait = document.body.classList.contains('portrait');
+    const step = portrait ? 4 : (mobile ? 10 : 8);
+    const maxSpread = portrait ? 8 : (mobile ? 42 : 34);
+    if (count <= 1) return 0;
+    return direction * Math.min(index * step, maxSpread * index / Math.max(1, count - 1));
+  }
+
+  function renderBoard() {
+    const points = [...els.points.querySelectorAll('.point')];
+    for (let physical = 0; physical < 24; physical++) {
+      const point = points[physical];
+      const stackEl = point.querySelector('.stack');
+      const stack = E.piecesAt(game, physical);
+      stackEl.replaceChildren();
+      point.classList.toggle('protected', stack.some(p => stack.filter(q => q.color === p.color).length >= 2));
+      point.classList.toggle('wall', ['white','black'].some(c => E.wallAt(game, physical, c)));
+      point.classList.toggle('has-selectable', stack.some(p => p.color === game.turn && !p.jailedBy && game.rolled && game.status === 'playing'));
+      point.classList.toggle('selected-source', stack.some(p => p.id === selectedId));
+      point.classList.toggle('legal', destinationMap.has(physical));
+      point.dataset.distance = destinationMap.has(physical) ? destinationMap.get(physical).map(m => m.distance).join('/') : '';
+      point.setAttribute('aria-label', describePoint(physical, stack));
+      stack.forEach((piece, index) => {
+        const checker = document.createElement('button');
+        checker.type = 'button';
+        checker.className = `checker ${piece.color}`;
+        checker.style.setProperty('--stack-offset', `${topOffset(index, stack.length, physical)}px`);
+        checker.dataset.piece = piece.id;
+        checker.title = `${E.capitalize(piece.color)} brick ${piece.id}${piece.jailedBy ? ' — jailed' : E.isJailer(game,piece.id) ? ' — jailer' : ''}`;
+        checker.setAttribute('aria-label', checker.title);
+        if (piece.jailedBy) checker.classList.add('jailed');
+        if (E.isJailer(game, piece.id)) checker.classList.add('jailer');
+        if (piece.color === game.turn && !piece.jailedBy && game.rolled && game.status === 'playing') {
+          checker.classList.add('selectable');
+          checker.addEventListener('click', event => { event.stopPropagation(); selectPiece(piece.id); });
+        } else checker.disabled = true;
+        stackEl.appendChild(checker);
+      });
+    }
+    els.board.classList.toggle('backgammon', game.settings.layout === 'backgammon');
+    els.board.classList.toggle('circuit', game.settings.layout === 'circuit');
+    els.whiteBank.classList.toggle('legal', bankMoves.some(m => m.piece.color === 'white'));
+    els.blackBank.classList.toggle('legal', bankMoves.some(m => m.piece.color === 'black'));
+    els.whiteBankCount.textContent = game.banks.white;
+    els.blackBankCount.textContent = game.banks.black;
+  }
+
+  function describePoint(physical, stack) {
+    if (!stack.length) return `Empty position ${physical + 1}${destinationMap.has(physical) ? ', legal landing' : ''}`;
+    const order = stack.slice().reverse().map(p => `${p.color}${p.jailedBy ? ' prisoner' : E.isJailer(game,p.id) ? ' jailer' : ''}`).join(', ');
+    return `Position ${physical + 1}, top to bottom: ${order}${destinationMap.has(physical) ? ', legal landing' : ''}`;
+  }
+
+  function renderStatus() {
+    els.status.textContent = game.message;
+    els.turnText.textContent = `${E.capitalize(game.turn)} to play`;
+    els.turnDot.className = `turn-dot ${game.turn}`;
+    els.choices.textContent = game.rolled ? `Available: ${E.availableDistances(game).join(' / ') || 'none'}` : '';
+    els.roll.disabled = game.rolled || game.status !== 'playing';
+    els.undo.disabled = history.length === 0;
+    els.whiteScore.textContent = game.roundWins.white;
+    els.blackScore.textContent = game.roundWins.black;
+    els.roundText.textContent = `Round ${game.round} · Best of ${game.settings.matchBestOf} · ${E.capitalize(game.settings.mode)}`;
+    renderDice();
+  }
+
+  function render() {
+    renderBoard();
+    renderStatus();
+  }
+
+  function selectPiece(pieceId) {
+    selectedId = pieceId;
+    destinationMap = new Map();
+    bankMoves = [];
+    const moves = E.legalMovesForPiece(game, pieceId);
+    for (const move of moves) {
+      if (move.bank) bankMoves.push(move);
+      else {
+        const existing = destinationMap.get(move.physical) || [];
+        existing.push(move);
+        destinationMap.set(move.physical, existing);
+      }
+    }
+    const piece = game.pieces.find(p => p.id === pieceId);
+    els.landingCallout.textContent = moves.length ? `${E.capitalize(piece.color)} ${piece.id}: ${moves.map(m => m.bank ? `Bank (${m.distance})` : `land ${m.distance}`).join(' · ')}` : 'No legal landing';
+    els.landingCallout.classList.add('show');
+    playTone(520, .045);
+    render();
+  }
+
+  function previewDestination(physical) {
+    if (!destinationMap.has(physical)) return;
+    const moves = destinationMap.get(physical);
+    els.landingCallout.textContent = `Landing uses ${moves.map(m => m.distance).join(' or ')} move${moves.length > 1 ? 's' : ''}`;
+    els.landingCallout.classList.add('show');
+  }
+  function clearPreview() {
+    if (!selectedId) els.landingCallout.classList.remove('show');
+  }
+
+  function activateDestination(physical) {
+    if (!selectedId || !destinationMap.has(physical)) return;
+    const move = destinationMap.get(physical)[0];
+    commitMove(move);
+  }
+
+  function activateBank(color) {
+    if (!selectedId) return;
+    const move = bankMoves.find(m => m.piece.color === color);
+    if (move) commitMove(move);
+  }
+
+  function commitMove(move) {
+    history.push(E.cloneState(game));
+    if (history.length > 80) history.shift();
+    const result = E.performMove(game, selectedId, move.distance);
+    selectedId = null; destinationMap.clear(); bankMoves = [];
+    els.landingCallout.classList.remove('show');
+    playTone(result.legal ? (result.bank ? 740 : 330) : 120, result.legal ? .08 : .18);
+    render();
+    if (game.status === 'round-over' || game.status === 'match-over') showCompletion();
+    else scheduleAutoRoll();
+  }
+
+  function doRoll() {
+    if (game.rolled || game.status !== 'playing') return;
+    E.roll(game);
+    selectedId = null; destinationMap.clear(); bankMoves = [];
+    playTone(190, .06); setTimeout(() => playTone(260, .06), 70);
+    render();
+    if (!game.rolled) scheduleAutoRoll();
+  }
+
+  function scheduleAutoRoll() {
+    clearTimeout(autoTimer);
+    if (game.settings.autoRoll && !game.rolled && game.status === 'playing') {
+      autoTimer = setTimeout(doRoll, 550);
+    }
+  }
+
+  function undo() {
+    if (!history.length) return;
+    clearTimeout(autoTimer);
+    E.restoreState(game, history.pop());
+    selectedId = null; destinationMap.clear(); bankMoves = [];
+    els.landingCallout.classList.remove('show');
+    render();
+  }
+
+  function readSettings() {
+    const form = new FormData(els.settingsForm);
+    return {
+      mode: form.get('mode'), diceCount: Number(form.get('diceCount')), wallSize: Number(form.get('wallSize')),
+      layout: form.get('layout'), matchBestOf: Number(form.get('matchBestOf')), autoRoll: form.get('autoRoll') === 'on'
+    };
+  }
+
+  function startGame(event) {
+    event.preventDefault();
+    game = E.createGame(readSettings());
+    history = []; selectedId = null; destinationMap.clear(); bankMoves = [];
+    els.settings.close();
+    render(); scheduleAutoRoll(); playTone(440, .08);
+  }
+
+  function restart() {
+    clearTimeout(autoTimer);
+    els.settings.showModal();
+  }
+
+  function showCompletion() {
+    els.messageTitle.textContent = game.status === 'match-over' ? 'Match complete' : 'Round complete';
+    els.messageBody.textContent = game.message;
+    els.continueBtn.textContent = game.status === 'match-over' ? 'New match' : 'Next round';
+    els.messageDialog.showModal();
+  }
+
+  function continueGame() {
+    els.messageDialog.close();
+    if (game.status === 'round-over') {
+      E.nextRound(game); history = []; render(); scheduleAutoRoll();
+    } else restart();
+  }
+
+  function playTone(frequency, duration) {
+    if (!soundOn) return;
+    try {
+      audioContext ||= new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
+      oscillator.frequency.value = frequency; oscillator.type = 'triangle';
+      gain.gain.setValueAtTime(.045, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.001, audioContext.currentTime + duration);
+      oscillator.connect(gain).connect(audioContext.destination); oscillator.start(); oscillator.stop(audioContext.currentTime + duration);
+    } catch (_) { /* sound is optional */ }
+  }
+
+  async function toggleFullscreen() {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+        if (document.body.classList.contains('mobile-ui') && screen.orientation && screen.orientation.lock) {
+          try { await screen.orientation.lock('landscape'); } catch (_) { /* browser may deny orientation lock */ }
+        }
+      } else await document.exitFullscreen();
+    } catch (_) {
+      game.message = 'Full screen is not available in this browser context.'; renderStatus();
+    }
+  }
+
+  function bind() {
+    els.settingsForm.addEventListener('submit', startGame);
+    els.roll.addEventListener('click', doRoll);
+    els.undo.addEventListener('click', undo);
+    els.restart.addEventListener('click', restart);
+    els.sound.addEventListener('click', () => { soundOn = !soundOn; els.sound.textContent = soundOn ? 'Sound on' : 'Sound off'; els.sound.setAttribute('aria-pressed', String(soundOn)); });
+    els.fullscreen.addEventListener('click', toggleFullscreen);
+    els.whiteBank.addEventListener('click', () => activateBank('white'));
+    els.blackBank.addEventListener('click', () => activateBank('black'));
+    els.continueBtn.addEventListener('click', continueGame);
+    window.addEventListener('resize', detectPresentation, { passive: true });
+    window.addEventListener('orientationchange', () => setTimeout(detectPresentation, 80), { passive: true });
+    document.addEventListener('fullscreenchange', () => { els.fullscreen.textContent = document.fullscreenElement ? 'Exit full' : 'Full screen'; detectPresentation(); });
+  }
+
+  createPoints(); bind(); detectPresentation(); render();
+  window.SoloCircuitApp = { getGame: () => game, detectPresentation, selectPiece, render };
+})();
+
+  </script>
+</body>
+</html>
